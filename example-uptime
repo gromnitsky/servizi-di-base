@@ -1,0 +1,8 @@
+[ "$1" = "-h" ] && {
+    echo 'Remote uptime(1)' > result
+    exit
+}
+
+echo Wait... > log
+sleep 2
+uptime > result
