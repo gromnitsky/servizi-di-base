@@ -100,17 +100,16 @@ function job_create(req, res, url) {
 function job_run(dir, exe, opt, args) {
     exe = path.resolve(exe)
     args = opt.concat(args)
-    let errorfile = path.join(dir, 'error')
-    let pidfile = path.join(dir, 'pid')
+    let meta = dir_meta_files(dir)
 
     let child = child_process.execFile(exe, args, {cwd: dir}, err => {
-        if (err) return fs.writeFileSync(errorfile, err.toString())
+        if (err) return fs.writeFileSync(meta.error, err.toString())
         // indicate the job is finished
-        fs.unlink(pidfile, () => {})
+        fs.unlink(meta.pid, () => {})
     })
 
     if (child.pid != null)
-        fs.writeFileSync(pidfile, child.pid.toString())
+        fs.writeFileSync(meta.pid, child.pid.toString())
 }
 
 function dir_meta_files(dir) {
@@ -159,6 +158,25 @@ function job_results(res, dir) {
     }
 }
 
+function job_kill(res, dir) {
+    if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
+    let meta = dir_meta_files(dir)
+    let pid
+    try { pid = fs.readFileSync(meta.pid) } catch (_) { /**/ }
+    pid = parseInt(pid)
+    if (isNaN(pid) || pid <= 0) return error(res, 500, `invalid pid`)
+
+    try {
+        process.kill(pid, 9)
+    } catch (err) {
+        return error(res, 500, err)
+    }
+
+    fs.writeFile(meta.error, `killed at ${new Date().toISOString()}`, () => {})
+    res.end()
+}
+
+
 if (process.argv[2]) process.chdir(process.argv[2])
 
 http.createServer( (req, res) => {
@@ -166,12 +184,26 @@ http.createServer( (req, res) => {
 
     let url = new URL(`http://example.com${req.url}`)
 
-    if (req.method === 'GET' && /^\/jobs\/[a-zA-Z0-9]{6,}$/.test(url.pathname)){
-        job_results(res, url.pathname.slice(1))
-    } else if (req.method === 'POST') {
+    switch (req.method) {
+    case 'POST':
         job_create(req, res, url)
-    } else {
-        error(res, 400, 'invalid request')
+        break
+    case 'GET': {
+        if (url.pathname.startsWith('/jobs/')) {
+            let s = url.pathname.split('/')
+            if (/^[a-zA-Z0-9]{6,20}$/.test(s[2])) {
+                let dir = `jobs/${s[2]}`
+                let fn = job_results
+                if (s[3] === 'kill') fn = job_kill
+                return fn(res, dir)
+            }
+        }
+
+        error(res, 400, 'bad request')
+        break
+    }
+    default:
+        error(res, 501, 'not implemented')
     }
 
 }).listen({port: process.env.PORT || 3000})
