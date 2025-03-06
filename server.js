@@ -124,8 +124,7 @@ function job_results(res, dir) {
 
     let meta = dir_meta_files(dir)
 
-    // 'error' file contains a short message from
-    // child_process.execFile, no need to make a stream
+    // 'error' file contains a short message from, no need to make a stream
     let r
     try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
     if (r) return error(res, 500, r)
@@ -164,10 +163,10 @@ function job_kill(res, dir) {
     let pid
     try { pid = fs.readFileSync(meta.pid) } catch (_) { /**/ }
     pid = parseInt(pid)
-    if (isNaN(pid) || pid <= 0) return error(res, 500, `invalid pid`)
+    if (isNaN(pid) || pid <= 0) return error(res, 400, `job is not running`)
 
     try {
-        process.kill(pid, 9)
+        process.kill(pid, 9)    // FIXME: kill all children too
     } catch (err) {
         return error(res, 500, err)
     }
