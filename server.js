@@ -124,9 +124,10 @@ function job_results(res, dir) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
 
     let meta = dir_meta_files(dir)
-    let r
 
-    //  errors are short, no need to make a stream
+    // 'error' file contains a short message from
+    // child_process.execFile, no need to make a stream
+    let r
     try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
     if (r) return error(res, 500, r)
 
@@ -137,10 +138,9 @@ function job_results(res, dir) {
         s.pipe(res)
     }
 
-    try { r = fs.readFileSync(meta.pid) } catch (_) { /**/ }
-    if (r) { // job is running
+    if (fs.existsSync(meta.pid)) { // job is still running
         res.statusCode = 418
-        log_check('job not ready')
+        log_check('job is running')
 
     } else {
         if (fs.existsSync(meta.result)) {
@@ -152,7 +152,7 @@ function job_results(res, dir) {
 
             s.pipe(res)
 
-        } else { // job finished unsuccessfully
+        } else { // job finished, but unsuccessfully
             res.statusCode = 500
             log_check('job failed w/o logs')
         }
