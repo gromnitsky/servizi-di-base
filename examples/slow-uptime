@@ -4,5 +4,5 @@
 }
 
 echo Wait... > log
-sleep 2
+sleep 5
 uptime > result
