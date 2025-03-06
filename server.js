@@ -32,6 +32,10 @@ function job_dir() {
     return fs.mkdtempSync(path.join('jobs', path.sep))
 }
 
+function job_rmdir(dir) {
+    fs.rm(dir, {recursive: true, force: true}, () => {})
+}
+
 function job_create(req, res, url) {
     let prog = detect_program(url)
     if (!fs.existsSync(prog.exe)) return error(res, 500, 'no such service')
@@ -42,7 +46,7 @@ function job_create(req, res, url) {
             headers: req.headers,
             limits: {
                 fileSize: 1024*1024*10,
-                files: 5
+                files: 2
             }
         })
     } catch (e) {
@@ -52,15 +56,36 @@ function job_create(req, res, url) {
     try { dir = job_dir() } catch (e) { return error(res, 500, e) }
 
     let files = []
+    let payload_failed = false
 
     bb.on('file', (_name, file, _info) => {
-        let save_to = path.join(dir, `payload.${files.length + 1}`)
+        let save_to = path.join(dir, `payload.${files.length}`)
+        //save_to = `/LOL`
         files.push(path.basename(save_to))
-        // FIXME: check for errors
-        file.pipe(fs.createWriteStream(save_to))
-    })
 
-    bb.on('close', () => {
+        let s = fs.createWriteStream(save_to)
+        s.on('error', err => {
+            console.error(`${dir}:`, err.message)
+            payload_failed = err
+            bb.destroy()
+        })
+
+        file.on('error', err => {
+            payload_failed = err
+        }).on('limit', () => {
+            payload_failed = new Error('file is too big')
+        }).pipe(s)
+
+    }).on('filesLimit', () => {
+        payload_failed = new Error('too many files')
+    }).on('error', err => {
+        payload_failed = err
+    }).on('close', () => {
+        if (payload_failed) {
+            error(res, 413, payload_failed)
+            return job_rmdir(dir)
+        }
+
         try {
             job_run(dir, prog.exe, prog.opt, files)
         } catch (e) {
@@ -68,8 +93,6 @@ function job_create(req, res, url) {
         }
         res.end(dir)
     })
-
-    // FIXME: listen to filesLimit (too many) and limit (file size)
 
     req.pipe(bb)
 }
@@ -124,11 +147,8 @@ function job_results(res, dir) {
             let s = fs.createReadStream(meta.result)
             res.setHeader('Content-Type', 'application/octet-stream')
 
-            s.on('error', err => {
-                error(res, 500, err)
-            }).on('close', () => {
-                fs.rm(dir, {recursive: true, force: true}, () => {})
-            })
+            s.on('error', err => error(res, 500, err))
+                .on('close', () => job_rmdir(dir))
 
             s.pipe(res)
 
@@ -151,7 +171,7 @@ http.createServer( (req, res) => {
     } else if (req.method === 'POST') {
         job_create(req, res, url)
     } else {
-        error(res, 400, 'Invalid Request')
+        error(res, 400, 'invalid request')
     }
 
 }).listen({port: process.env.PORT || 3000})
