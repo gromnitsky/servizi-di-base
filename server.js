@@ -102,7 +102,7 @@ function job_run(dir, exe, opt, args) {
     let meta = dir_meta_files(dir)
 
     let child = child_process.execFile(exe, args, {cwd: dir}, err => {
-        if (err) return fs.writeFileSync(meta.error, err.toString())
+        if (err) fs.writeFileSync(meta.error, err.toString())
         // indicate the job is finished
         fs.unlink(meta.pid, () => {})
     })
@@ -125,7 +125,7 @@ function job_results(res, dir) {
 
     let r
     try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
-    if (r) return error(res, 500, r)
+    if (r) return error(res, 500, 'job failed', r)
 
     let log_check = msg => {
         let s = fs.createReadStream(meta.log)
@@ -173,6 +173,15 @@ function job_kill(res, dir) {
     res.end()
 }
 
+function job_log(res, dir) {
+    if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
+    let meta = dir_meta_files(dir)
+    let s = fs.createReadStream(meta.log)
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    s.on('error', () => res.end())
+    s.pipe(res)
+}
+
 
 if (process.argv[2]) process.chdir(process.argv[2])
 
@@ -192,6 +201,7 @@ http.createServer( (req, res) => {
                 let dir = `jobs/${s[2]}`
                 let fn = job_results
                 if (s[3] === 'kill') fn = job_kill
+                if (s[3] === 'log') fn = job_log
                 return fn(res, dir)
             }
         }

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+type kindlepreviewer > log 2>&1 || exit 1
+
+kindlepreviewer "$1" -convert > log 2>&1
+
+kpf=`find . -type f | grep -m1 kpf 2>log` || {
+    echo conversion failed >> log
+    exit 1
+}
+mv "$kpf" result
