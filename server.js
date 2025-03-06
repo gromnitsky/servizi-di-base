@@ -28,7 +28,7 @@ function detect_program(url) {
 }
 
 function job_dir() {
-    try { fs.mkdirSync('jobs') } catch (_) { /**/ }
+    fs.mkdirSync('jobs', {recursive: true, mode: 0o700})
     return fs.mkdtempSync(path.join('jobs', path.sep))
 }
 
@@ -41,6 +41,7 @@ function job_create(req, res, url) {
     if (!fs.existsSync(prog.exe)) return error(res, 500, 'no such service')
 
     let bb, dir
+    try { dir = job_dir() } catch (e) { return error(res, 500, e) }
     try {
         bb = busboy({
             headers: req.headers,
@@ -52,8 +53,6 @@ function job_create(req, res, url) {
     } catch (e) {
         return error(res, 412, e)
     }
-
-    try { dir = job_dir() } catch (e) { return error(res, 500, e) }
 
     let files = []
     let payload_failed = false
@@ -124,7 +123,6 @@ function job_results(res, dir) {
 
     let meta = dir_meta_files(dir)
 
-    // 'error' file contains a short message from, no need to make a stream
     let r
     try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
     if (r) return error(res, 500, r)
