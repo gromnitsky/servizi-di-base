@@ -106,7 +106,7 @@ function job_run(dir, exe, opt, args) {
     let child = child_process.execFile(exe, args, {cwd: dir}, err => {
         if (err) return fs.writeFileSync(errorfile, err.toString())
         // indicate the job is finished
-        try { fs.unlinkSync(pidfile) } catch (_) { /**/ }
+        fs.unlink(pidfile, () => {})
     })
 
     if (child.pid != null)
