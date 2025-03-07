@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env -S stdbuf -o0 -e0 bash
 
 type kindlepreviewer || exit 1
 

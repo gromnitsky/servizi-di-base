@@ -100,7 +100,7 @@ function job_run(dir, exe, opt, args) {
     exe = path.resolve(exe)
     args = opt.concat(args)
     let meta = dir_meta_files(dir)
-    let IGNERR = () => {}
+    let IGNERR = e => console.error(dir, e)
 
     let log_stream = fs.createWriteStream(meta.log)
     log_stream.on('error', IGNERR)
@@ -110,17 +110,16 @@ function job_run(dir, exe, opt, args) {
         stdio: ['ignore', 'pipe', 'pipe']
     })
 
-    child.stdout.pipe(log_stream)
     child.stderr.pipe(log_stream)
+    child.stdout.pipe(log_stream)
 
+    // removing a pid file is an indicator that the job is finished
     child.on('error', err => {
         fs.writeFile(meta.error, err.toString(), IGNERR)
-        // indicate the job is finished
         fs.unlink(meta.pid, IGNERR)
     }).on('exit', code => {
         if (code !== 0)
             fs.writeFile(meta.error, `exit code: ${code}`, IGNERR)
-        // indicate the job is finished
         fs.unlink(meta.pid, IGNERR)
     })
 
