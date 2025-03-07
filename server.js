@@ -174,11 +174,10 @@ function job_kill(res, dir) {
     let pid = parseInt(readfile(meta.pid))
     if (isNaN(pid) || pid <= 0) return error(res, 400, `job is not running`)
 
-    try {
-        process.kill(pid, 9)    // FIXME: kill all children too
-    } catch (err) {
-        return error(res, 500, err)
-    }
+    // process + its children
+    child_process.exec(`pgrep -P ${pid} | xargs kill -9 ${pid}`, err => {
+        if (err) console.error('job_kill', dir, err)
+    })
 
     res.end()
 }
