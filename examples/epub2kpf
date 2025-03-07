@@ -1,12 +1,12 @@
 #!/bin/sh
 
-type kindlepreviewer > log 2>&1 || exit 1
+type kindlepreviewer || exit 1
 
 mv "$1" "$1.epub"
-kindlepreviewer "$1.epub" -convert > log 2>&1
+kindlepreviewer "$1.epub" -convert
 
-kpf=`find . -type f | grep -m1 kpf 2>log` || {
-    echo conversion failed >> log
+kpf=`find . -type f | grep -m1 kpf` || {
+    echo conversion failed
     exit 1
 }
 mv "$kpf" result

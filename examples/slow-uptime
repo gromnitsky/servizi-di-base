@@ -4,10 +4,10 @@
 }
 
 [ "$1" = "-1" ] && {
-    echo 'testing exit code 1' > log
+    echo 'testing exit code 1' 1>&2
     exit 1
 }
 
-echo Wait... > log
+echo Wait...
 sleep 5
 uptime > result

@@ -23,7 +23,7 @@ function error(writable, status, err, text) {
 function detect_program(url) {
     return {
         exe: url.pathname.split('/')[1],
-        opt: Array.from(url.searchParams).map( ([k, v]) => [`-${k}`, v]).flat()
+        opt: Array.from(url.searchParams).flat()
     }
 }
 
@@ -88,7 +88,7 @@ function job_create(req, res, url) {
         try {
             job_run(dir, prog.exe, prog.opt, files)
         } catch (e) {
-            return error(res, 500, e)
+            return error(res, 500, 'job_run failed', e)
         }
         res.end(dir)
     })
@@ -100,11 +100,28 @@ function job_run(dir, exe, opt, args) {
     exe = path.resolve(exe)
     args = opt.concat(args)
     let meta = dir_meta_files(dir)
+    let IGNERR = () => {}
 
-    let child = child_process.execFile(exe, args, {cwd: dir}, err => {
-        if (err) fs.writeFileSync(meta.error, err.toString())
+    let log_stream = fs.createWriteStream(meta.log)
+    log_stream.on('error', IGNERR)
+
+    let child = child_process.spawn(exe, args, {
+        cwd: dir,
+        stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    child.stdout.pipe(log_stream)
+    child.stderr.pipe(log_stream)
+
+    child.on('error', err => {
+        fs.writeFile(meta.error, err.toString(), IGNERR)
         // indicate the job is finished
-        fs.unlink(meta.pid, () => {})
+        fs.unlink(meta.pid, IGNERR)
+    }).on('exit', code => {
+        if (code !== 0)
+            fs.writeFile(meta.error, `exit code: ${code}`, IGNERR)
+        // indicate the job is finished
+        fs.unlink(meta.pid, IGNERR)
     })
 
     if (child.pid != null)
