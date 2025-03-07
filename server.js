@@ -3,8 +3,9 @@
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
-import busboy from 'busboy'
 import child_process from 'child_process'
+
+import busboy from 'busboy'
 
 function error(writable, status, err, text) {
     let msg = err.message || err
@@ -59,12 +60,11 @@ function job_create(req, res, url) {
 
     bb.on('file', (_name, file, _info) => {
         let save_to = path.join(dir, `payload.${files.length}`)
-        //save_to = `/LOL`
         files.push(path.basename(save_to))
 
         let s = fs.createWriteStream(save_to)
         s.on('error', err => {
-            console.error(`${dir}:`, err.message)
+            console.error('job_create', dir, err.message)
             payload_failed = err
             bb.destroy()
         })
@@ -88,7 +88,7 @@ function job_create(req, res, url) {
         try {
             job_run(dir, prog.exe, prog.opt, files)
         } catch (e) {
-            return error(res, 500, 'job_run failed', e)
+            return error(res, 500, 'job_run() failed', e)
         }
         res.end(dir + "\n")
     })
@@ -100,7 +100,7 @@ function job_run(dir, exe, opt, args) {
     exe = path.resolve(exe)
     args = opt.concat(args)
     let meta = dir_meta_files(dir)
-    let IGNERR = e => console.error(dir, e)
+    let IGNERR = e => { if (e) console.error('job_run', dir, e) }
 
     let log_stream = fs.createWriteStream(meta.log)
     log_stream.on('error', IGNERR)
@@ -152,14 +152,18 @@ function job_result(res, dir) {
             let s = fs.createReadStream(meta.result)
             res.setHeader('Content-Type', 'application/octet-stream')
 
-            s.on('error', err => error(res, 500, err))
-                .on('close', () => job_rmdir(dir))
+            s.on('error', err => {
+                // FIXME: if there was a reading error _during_ a
+                // trasmission, this just appends junk
+                error(res, 500, 'job_result() error', err)
+            }).on('close', () => job_rmdir(dir))
 
             s.pipe(res)
 
         } else { // job is finished, but unsuccessfully
             res.statusCode = 500
-            job_log(res, dir, 'job failed w/o logs')
+            res.statusMessage = 'job failed'
+            job_log(res, dir)
         }
     }
 }
