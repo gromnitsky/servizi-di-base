@@ -7,17 +7,14 @@ import child_process from 'child_process'
 
 import busboy from 'busboy'
 
-function error(writable, status, err, text) {
+function error(writable, code, err, desc) {
     let msg = err.message || err
     if (!writable.headersSent) {
-        writable.statusCode = status
-        try {
-            writable.setHeader('Content-Type', 'text/plain; charset=utf-8')
-            writable.statusMessage = msg
-        } catch {/**/}
+        writable.statusCode = code
+        writable.setHeader('Content-Type', 'text/plain; charset=utf-8')
     }
-    let body = `HTTP ${status}: ${msg}\n`
-    if (text) body = [body, "\n", text, "\n"].join``
+    let body = `${msg}\n`
+    if (desc) body = [body, desc, "\n"].join``
     writable.end(body)
 }
 
@@ -120,7 +117,7 @@ function job_run(dir, exe, opt, args) {
     }).on('exit', (code, sig) => {
         fs.unlink(meta.pid, IGNERR)
         if (code === 0) return
-        let msg = code != null ? `exit code ${code}` : sig
+        let msg = code != null ? `exit status ${code}` : sig
         fs.writeFile(meta.error, msg, IGNERR)
     })
 
@@ -135,45 +132,46 @@ function dir_meta_files(dir) {
     }, {})
 }
 
+function readfile(name) {
+    let r; try { r = fs.readFileSync(name) } catch (_) { /**/ }
+    return r
+}
+
 function job_result(res, dir) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
 
     let meta = dir_meta_files(dir)
 
-    let r
-    try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
-    if (r) return error(res, 500, 'job failed', r)
+    let text = readfile(meta.error)
+    if (text) return error(res, 500, 'job failed', text)
 
-    if (fs.existsSync(meta.pid)) { // job is not finished
+    if (fs.existsSync(meta.result)) {
+        res.setHeader('Content-Type', 'application/octet-stream')
+        let s = fs.createReadStream(meta.result)
+        let keep = false
+
+        s.on('error', err => {
+            keep = true
+            // FIXME: if there was a reading error _during_ a
+            // trasmission, this just appends junk to a partial result
+            error(res, 500, 'job_result() fail', err)
+        }).on('close', () => {
+            if (!keep) job_rmdir(dir)
+        }).pipe(res)
+
+    } else if (fs.existsSync(meta.pid)) { // job is NOT finished
         job_log(res, dir, 'job is running')
 
-    } else {
-        if (fs.existsSync(meta.result)) {
-            let s = fs.createReadStream(meta.result)
-            res.setHeader('Content-Type', 'application/octet-stream')
-
-            s.on('error', err => {
-                // FIXME: if there was a reading error _during_ a
-                // trasmission, this just appends junk
-                error(res, 500, 'job_result() error', err)
-            }).on('close', () => job_rmdir(dir))
-
-            s.pipe(res)
-
-        } else { // job is finished, but unsuccessfully
-            res.statusCode = 500
-            res.statusMessage = 'job failed'
-            job_log(res, dir)
-        }
+    } else { // job IS finished, but unsuccessfully
+        res.statusCode = 500
+        job_log(res, dir, 'job failed')
     }
 }
 
 function job_kill(res, dir) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
     let meta = dir_meta_files(dir)
-    let pid
-    try { pid = fs.readFileSync(meta.pid) } catch (_) { /**/ }
-    pid = parseInt(pid)
+    let pid = parseInt(readfile(meta.pid))
     if (isNaN(pid) || pid <= 0) return error(res, 400, `job is not running`)
 
     try {
@@ -188,9 +186,13 @@ function job_kill(res, dir) {
 function job_log(res, dir, alt_msg) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
     let meta = dir_meta_files(dir)
-    let s = fs.createReadStream(meta.log)
-    if (fs.existsSync(meta.pid) && res.statusCode !== 500) res.statusCode = 418
+    if (fs.existsSync(meta.error)) {
+        res.statusCode = 500
+    } else if (!fs.existsSync(meta.result) && res.statusCode !== 500) {
+        res.statusCode = 418
+    }
     res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    let s = fs.createReadStream(meta.log)
     s.on('error', () => res.end(alt_msg ? `${alt_msg}\n`: ''))
     s.pipe(res)
 }
