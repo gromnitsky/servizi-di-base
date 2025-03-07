@@ -15,8 +15,8 @@ function error(writable, status, err, text) {
             writable.statusMessage = msg
         } catch {/**/}
     }
-    let body = `HTTP ${status}: ${msg}`
-    if (text) body = [body, "\n\n", text].join``
+    let body = `HTTP ${status}: ${msg}\n`
+    if (text) body = [body, "\n", text, "\n"].join``
     writable.end(body)
 }
 
@@ -38,7 +38,7 @@ function job_rmdir(dir) {
 
 function job_create(req, res, url) {
     let prog = detect_program(url)
-    if (!fs.existsSync(prog.exe)) return error(res, 500, 'no such service')
+    if (!fs.existsSync(prog.exe)) return error(res, 500, 'no such program')
 
     let bb, dir
     try { dir = job_dir() } catch (e) { return error(res, 500, e) }
@@ -90,7 +90,7 @@ function job_create(req, res, url) {
         } catch (e) {
             return error(res, 500, 'job_run failed', e)
         }
-        res.end(dir)
+        res.end(dir + "\n")
     })
 
     req.pipe(bb)
@@ -117,10 +117,11 @@ function job_run(dir, exe, opt, args) {
     child.on('error', err => {
         fs.writeFile(meta.error, err.toString(), IGNERR)
         fs.unlink(meta.pid, IGNERR)
-    }).on('exit', code => {
-        if (code !== 0)
-            fs.writeFile(meta.error, `exit code: ${code}`, IGNERR)
+    }).on('exit', (code, sig) => {
         fs.unlink(meta.pid, IGNERR)
+        if (code === 0) return
+        let msg = code != null ? `exit code ${code}` : sig
+        fs.writeFile(meta.error, msg, IGNERR)
     })
 
     if (child.pid != null)
@@ -134,7 +135,7 @@ function dir_meta_files(dir) {
     }, {})
 }
 
-function job_results(res, dir) {
+function job_result(res, dir) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
 
     let meta = dir_meta_files(dir)
@@ -143,16 +144,8 @@ function job_results(res, dir) {
     try { r = fs.readFileSync(meta.error) } catch (_) { /**/ }
     if (r) return error(res, 500, 'job failed', r)
 
-    let log_check = msg => {
-        let s = fs.createReadStream(meta.log)
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-        s.on('error', () => res.end(msg))
-        s.pipe(res)
-    }
-
-    if (fs.existsSync(meta.pid)) { // job is still running
-        res.statusCode = 418
-        log_check('job is running')
+    if (fs.existsSync(meta.pid)) { // job is not finished
+        job_log(res, dir, 'job is running')
 
     } else {
         if (fs.existsSync(meta.result)) {
@@ -164,9 +157,9 @@ function job_results(res, dir) {
 
             s.pipe(res)
 
-        } else { // job finished, but unsuccessfully
+        } else { // job is finished, but unsuccessfully
             res.statusCode = 500
-            log_check('job failed w/o logs')
+            job_log(res, dir, 'job failed w/o logs')
         }
     }
 }
@@ -185,51 +178,55 @@ function job_kill(res, dir) {
         return error(res, 500, err)
     }
 
-    fs.writeFile(meta.error, `killed at ${new Date().toISOString()}`, () => {})
     res.end()
 }
 
-function job_log(res, dir) {
+function job_log(res, dir, alt_msg) {
     if (!fs.existsSync(dir)) return error(res, 404, 'job not found')
     let meta = dir_meta_files(dir)
     let s = fs.createReadStream(meta.log)
+    if (fs.existsSync(meta.pid) && res.statusCode !== 500) res.statusCode = 418
     res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-    s.on('error', () => res.end())
+    s.on('error', () => res.end(alt_msg ? `${alt_msg}\n`: ''))
     s.pipe(res)
+}
+
+function request(req, res) {
+    console.error(req.method, req.url)
+
+    let url = new URL(`http://example.com${req.url}`)
+
+    if (req.method === 'POST') {
+        job_create(req, res, url)
+    } else if (req.method === 'GET') {
+        if (url.pathname.startsWith('/jobs/')) {
+            let s = url.pathname.split('/')
+            if (/^[a-zA-Z0-9]{6,20}$/.test(s[2])) {
+                let dir = `jobs/${s[2]}`
+                let fn = {
+                    'result': job_result,
+                    'kill'  : job_kill,
+                    'log'   : job_log,
+                    'logs'  : job_log,
+                }[s[3] || 'result']
+
+                if (fn) return fn(res, dir)
+            }
+        }
+        error(res, 400, 'bad request')
+    } else {
+        error(res, 501, 'not implemented')
+    }
 }
 
 
 if (process.argv[2]) process.chdir(process.argv[2])
 
-http.createServer( (req, res) => {
-    console.error(req.method, req.url)
-
-    let url = new URL(`http://example.com${req.url}`)
-
-    switch (req.method) {
-    case 'POST':
-        job_create(req, res, url)
-        break
-    case 'GET': {
-        if (url.pathname.startsWith('/jobs/')) {
-            let s = url.pathname.split('/')
-            if (/^[a-zA-Z0-9]{6,20}$/.test(s[2])) {
-                let dir = `jobs/${s[2]}`
-                let fn = job_results
-                if (s[3] === 'kill') fn = job_kill
-                if (s[3] === 'log') fn = job_log
-                return fn(res, dir)
-            }
-        }
-
-        error(res, 400, 'bad request')
-        break
-    }
-    default:
-        error(res, 501, 'not implemented')
-    }
-
-}).listen({port: process.env.PORT || 3000})
-
-console.error('CWD:', process.cwd())
-console.error('PID:', process.pid)
+http.createServer()
+    .on('request', request)
+    .on('listening', function() {
+        let addr = this.address()
+        console.error('PID: ', process.pid)
+        console.error('CWD: ', process.cwd())
+        console.error('ADDR:', `${addr.address}:${addr.port}`)
+    }).listen(process.env.PORT || 3000, process.env.HOST || '127.0.0.1')
