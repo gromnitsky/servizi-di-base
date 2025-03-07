@@ -1,4 +1,10 @@
-#!/usr/bin/env -S stdbuf -o0 -e0 bash
+#!/usr/bin/env -S gstdbuf -o0 -e0 bash
+
+# macOS:
+#
+# $ sudo port install coreutils
+# $ file -h `which kindlepreviewer `
+# /Users/alex/bin/kindlepreviewer: symbolic link to /Applications/Kindle Previewer 3.app/Contents/MacOS/Kindle Previewer 3
 
 type kindlepreviewer || exit 1
 
