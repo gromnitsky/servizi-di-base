@@ -36,7 +36,7 @@ function job_rmdir(dir) {
 
 function job_create(req, res, url) {
     let prog = detect_program(url)
-    if (!fs.existsSync(prog.exe)) return error(res, 500, 'no such program')
+    if (!fs.existsSync(prog.exe)) return error(res, 404, 'no such program')
 
     let bb, dir
     try { dir = job_dir() } catch (e) { return error(res, 500, e) }
