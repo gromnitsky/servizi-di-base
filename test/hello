@@ -1,2 +1,4 @@
+#!/usr/bin/env -S stdbuf -o0 -e0 bash
+
 echo hello
 echo world > result

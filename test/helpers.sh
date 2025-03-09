@@ -6,15 +6,20 @@ trap stop 0
 
 stop() {
     ps --forest -o pid= -g "`cat "$pidfile"`" | xargs -r kill
-    rm -rf server.pid
+    rm -rf server.pid jobs
 }
 
 start() {
     rm -f cookies.txt
     daemonize -c "`pwd`" -p "$pidfile" -E PORT=$port \
               "`readlink -f ../server.js`"
-    timeout 2 sh -c "while ! ncat -z $host $port; do sleep 0.1; done" ||
-        errx "failed to connect to $host:$port"
+    try_for_2_sec "failed to connect to $host:$port" ncat -z $host $port
+}
+
+try_for_2_sec() {
+    local msg="$1"
+    shift
+    timeout 2 sh -c "while ! $*; do sleep 0.1; done" || errx "$msg"
 }
 
 errx() { echo "FAILED: $*" 1>&2; exit 1; }
