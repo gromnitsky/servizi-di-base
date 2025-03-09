@@ -4,7 +4,7 @@
 
 start
 
-echo "wrong ways to start a job"
+echo "job start badly"
 
 printf .
 curl -si $host:$port | head -10 | grep -q '^HTTP/1.1 400' || errx "/ must return 400"
@@ -84,6 +84,32 @@ curl -si $host:$port/"$job" | grep_2_patterns '^HTTP/1.1 418' 'is running' ||
 
 # ------------------------------------------------------------------------------
 
-#printf "\n%s\n" "job kill"
+printf "\n%s\n" "job kill"
+
+printf .
+curl -si $host:$port/jobs/000000/kill | grep -q '^HTTP/1.1 404' ||
+    errx "$job must not exists"
+
+printf .
+job=`mktemp -u jobs/XXXXXX`
+mkdir "$job"
+curl -si $host:$port/"$job"/kill |
+    grep_2_patterns '^HTTP/1.1 400' 'not running' ||
+    errx "$job must not run"
+
+printf .
+job=`curl -sf $host:$port/slow-uptime -F a=@/dev/null`
+try_for_2_sec "$job must have a pid file" test -r "$job/pid"
+
+printf .
+curl -si $host:$port/"$job"/kill | grep -q '^HTTP/1.1 200' ||
+    errx "/$job/kill must return 200"
+
+printf .
+try_for_2_sec "$job must not have a pid file" test ! -r "$job/pid"
+
+printf .
+curl -si $host:$port/"$job" | grep_2_patterns '^HTTP/1.1 500' '^SIGKILL' ||
+    errx "/$job must return 500, for it was killed"
 
 echo
