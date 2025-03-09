@@ -8,6 +8,11 @@
 
 type kindlepreviewer || exit 1
 
+file -b --mime-type "$1" | grep -qx application/epub+zip || {
+    echo payload is not epub 1>&2
+    exit 1
+}
+
 mv "$1" "$1.epub"
 
 # at the time of writing, Kindle Previewer always return exit code 0,
