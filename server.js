@@ -6,6 +6,7 @@ import path from 'path'
 import child_process from 'child_process'
 
 import busboy from 'busboy'
+import which from './which.js'
 
 function error(writable, code, err, desc) {
     let msg = err.message || err
@@ -94,15 +95,14 @@ function job_create(req, res, url) {
 }
 
 function job_run(dir, exe, opt, args) {
-    exe = path.resolve(exe)
-    args = opt.concat(args)
     let meta = dir_meta_files(dir)
     let IGNERR = e => { if (e) console.error('job_run', dir, e) }
 
     let log_stream = fs.createWriteStream(meta.log)
     log_stream.on('error', IGNERR)
 
-    let child = child_process.spawn(exe, args, {
+    args = ['-o0', '-e0'].concat(path.resolve(exe), opt, args)
+    let child = child_process.spawn(stdbuf, args, {
         cwd: dir,
         stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -226,6 +226,11 @@ function request(req, res) {
 
 
 if (process.argv[2]) process.chdir(process.argv[2])
+let stdbuf = which('gstdbuf', 'stdbuf').filter(Boolean)[0]
+if (!stdbuf) {
+    console.error('no [g]stdbuf')
+    process.exit(1)
+}
 
 http.createServer()
     .on('request', request)

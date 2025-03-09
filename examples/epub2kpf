@@ -1,4 +1,4 @@
-#!/usr/bin/env -S gstdbuf -o0 -e0 bash
+#!/bin/sh
 
 # macOS:
 #
@@ -9,6 +9,9 @@
 type kindlepreviewer || exit 1
 
 mv "$1" "$1.epub"
+
+# at the time of writing, Kindle Previewer always return exit code 0,
+# even if its conversion failed
 kindlepreviewer "$1.epub" -convert
 
 kpf=`find . -type f | grep -m1 kpf` || {

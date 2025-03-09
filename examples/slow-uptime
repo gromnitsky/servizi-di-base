@@ -1,4 +1,4 @@
-#!/usr/bin/env -S stdbuf -o0 -e0 bash
+#!/bin/sh
 
 [ "$1" = "-h" ] && {
     echo 'Remote uptime(1)' > result
