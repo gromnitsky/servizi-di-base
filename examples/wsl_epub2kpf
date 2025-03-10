@@ -1,0 +1,29 @@
+#!/bin/sh
+
+type kindlepreviewer.bat || exit 1
+
+file -b --mime-type "$1" | grep -qx application/epub+zip || {
+    echo payload is not epub 1>&2
+    exit 1
+}
+
+tmp="$(wslpath $(cmd.exe /c "echo %TMP%" 2>/dev/null | tr -d \\r))/XXXXXX"
+tmp="`mktemp -d "$tmp"`" || exit 1
+
+trap 'rm -rf "$tmp"' 0
+
+cp "$1" "$tmp/$1.epub"
+wd_orig="`pwd`"
+cd "$tmp"
+
+# at the time of writing, Kindle Previewer always return exit code 0,
+# even if its conversion failed
+cmd.exe /c kindlepreviewer.bat "$1.epub" -convert 1>&2
+
+kpf=`find . -type f | grep -m1 kpf` || {
+    echo conversion failed 1>&2
+    exit 1
+}
+
+cd "$wd_orig"
+mv "$tmp/$kpf" result
