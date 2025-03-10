@@ -1,13 +1,17 @@
 #!/bin/sh
 
+errx() { echo "`basename "$0"` error: $*" 1>&2; exit 1; }
+
+[ -z "$WSL_DISTRO_NAME" ] && errx "not a WSL env"
+
 type kindlepreviewer.bat || exit 1
 
-file -b --mime-type "$1" | grep -qx application/epub+zip || {
-    echo payload is not epub 1>&2
-    exit 1
-}
+file -b --mime-type "$1" | grep -qx application/epub+zip ||
+    errx payload is not epub
 
-tmp="$(wslpath $(cmd.exe /c "echo %TMP%" 2>/dev/null | tr -d \\r))/XXXXXX"
+# cmd.exe won't work inside "UNC path", hence make a tmp dir on a
+# "real" drive
+tmp="$(wslpath "$(cmd.exe /c "echo %TMP%" 2>/dev/null | tr -d \\r)")/XXXXXX"
 tmp="`mktemp -d "$tmp"`" || exit 1
 
 trap 'rm -rf "$tmp"' 0
@@ -18,12 +22,9 @@ cd "$tmp"
 
 # at the time of writing, Kindle Previewer always return exit code 0,
 # even if its conversion failed
-cmd.exe /c kindlepreviewer.bat "$1.epub" -convert 1>&2
+cmd.exe /c kindlepreviewer.bat "$1.epub" -convert
 
-kpf=`find . -type f | grep -m1 kpf` || {
-    echo conversion failed 1>&2
-    exit 1
-}
+kpf=`find . -type f | grep -m1 kpf` || errx conversion failed
 
 cd "$wd_orig"
 mv "$tmp/$kpf" result

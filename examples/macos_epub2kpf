@@ -1,15 +1,13 @@
 #!/bin/sh
 
-# macOS:
-#
-# $ sudo port install coreutils
+# $ sudo port install coreutils # for gstdbuf util
 # $ file -h `which kindlepreviewer `
 # /Users/alex/bin/kindlepreviewer: symbolic link to /Applications/Kindle Previewer 3.app/Contents/MacOS/Kindle Previewer 3
 
 type kindlepreviewer || exit 1
 
 file -b --mime-type "$1" | grep -qx application/epub+zip || {
-    echo payload is not epub 1>&2
+    echo payload is not epub
     exit 1
 }
 
