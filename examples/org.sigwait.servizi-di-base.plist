@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>org.sigwait.servizi-di-base</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/alex/opt/bin/node</string>
+      <string>/Users/alex/lib/software/alex/servizi-di-base/server.js</string>
+      <string>/Users/alex/lib/software/alex/servizi-di-base/examples</string>
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- <key>KeepAlive</key> -->
+    <!-- <true/> -->
+
+    <key>StandardErrorPath</key>
+    <string>/Users/alex/Library/Logs/org.sigwait.servizi-di-base.log</string>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/alex/Library/Logs/org.sigwait.servizi-di-base.log</string>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOST</key>
+      <string>0.0.0.0</string>
+      <key>PORT</key>
+      <string>3008</string>
+      <key>PATH</key>
+      <string>/opt/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    
+  </dict>
+</plist>
