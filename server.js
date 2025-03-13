@@ -4,6 +4,7 @@ import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import child_process from 'child_process'
+import os from 'os'
 
 import busboy from 'busboy'
 import which from './which.js'
@@ -22,7 +23,7 @@ function error(writable, code, err, desc) {
 function detect_program(url) {
     return {
         exe: url.pathname.split('/')[1],
-        opt: Array.from(url.searchParams).flat()
+        opt: Array.from(url.searchParams).flat().filter(Boolean)
     }
 }
 
@@ -94,6 +95,10 @@ function job_create(req, res, url) {
     req.pipe(bb)
 }
 
+function shellescape(s) {
+    return "'" + (s || '').replaceAll("'", "'\\''") + "'"
+}
+
 function job_run(dir, exe, opt, args) {
     let meta = dir_meta_files(dir)
     let IGNERR = e => { if (e) console.error('job_run', dir, e) }
@@ -101,8 +106,20 @@ function job_run(dir, exe, opt, args) {
     let log_stream = fs.createWriteStream(meta.log)
     log_stream.on('error', IGNERR)
 
-    args = ['-o0', '-e0'].concat(path.resolve(exe), opt, args)
-    let child = child_process.spawn(stdbuf, args, {
+    let cmd = path.join(dir, 'cmd')
+
+    let script_args = ['/dev/null', '-q', '-e']
+    if (os.platform() === 'linux') script_args.push('-c')
+    script_args.push('./cmd')
+
+    fs.writeFileSync(cmd, [
+        '#!/bin/sh',
+        `exec ${path.resolve(exe)} `
+            + [].concat(opt, args).map(shellescape).join` `
+    ].join`\n`)
+    fs.chmodSync(cmd, 0o700)
+
+    let child = child_process.spawn('script', script_args, {
         cwd: dir,
         stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -224,13 +241,16 @@ function request(req, res) {
     }
 }
 
-
-if (process.argv[2]) process.chdir(process.argv[2])
-let stdbuf = which('gstdbuf', 'stdbuf').filter(Boolean)[0]
-if (!stdbuf) {
-    console.error('no [g]stdbuf')
+function errx(...s) {
+    console.log(`servizi-di-base error:`, ...s)
     process.exit(1)
 }
+
+
+if ( !which('script')) errx("no 'script' util")
+if (os.platform() === 'win32') errx("unsupported platform")
+
+if (process.argv[2]) process.chdir(process.argv[2])
 
 http.createServer()
     .on('request', request)

@@ -1,6 +1,6 @@
 ## Reqs
 
-node v22, stdbuf util from coreutils.
+node v22, script(1)
 
 ## Usage
 
