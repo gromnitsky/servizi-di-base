@@ -37,7 +37,7 @@ job=`curl -sf $host:$port/hello -F a=@/dev/null`
 echo "$job" | grep -qE '^jobs/.+$' || "/hello must return a job id: jobs/XXXXXX"
 
 printf .
-try_for_2_sec "$job/log must contain 'hello'" grep -qx hello "$job/log"
+try_for_2_sec "$job/log must contain 'hello'" grep -qx hello$'\r' "$job/log"
 
 printf .
 curl -sf $host:$port/"$job" | grep -qx world || errx "/hello must return 'world'"
