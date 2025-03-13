@@ -1,24 +1,21 @@
 #!/bin/sh
 
-# $ sudo port install coreutils # for gstdbuf util
-# $ file -h `which kindlepreviewer `
-# /Users/alex/bin/kindlepreviewer: symbolic link to /Applications/Kindle Previewer 3.app/Contents/MacOS/Kindle Previewer 3
+errx() { echo "$*"; exit 1; }
 
-type kindlepreviewer || exit 1
+kindlepreviewer='/Applications/Kindle Previewer 3.app/Contents/MacOS/Kindle Previewer 3'
 
-file -b --mime-type "$1" | grep -qx application/epub+zip || {
-    echo payload is not epub
-    exit 1
-}
+file -b --mime-type "$kindlepreviewer" |
+    grep -m1 -qx application/x-mach-binary ||
+    errx "not an executable: $kindlepreviewer"
+
+file -b --mime-type "$1" | grep -qx application/epub+zip ||
+    errx payload is not epub
 
 mv "$1" "$1.epub"
 
 # at the time of writing, Kindle Previewer always return exit code 0,
 # even if its conversion failed
-kindlepreviewer "$1.epub" -convert
+"$kindlepreviewer" "$1.epub" -convert
 
-kpf=`find . -type f | grep -m1 kpf` || {
-    echo conversion failed
-    exit 1
-}
+kpf=`find . -type f | grep -m1 kpf` || errx conversion failed
 mv "$kpf" result
