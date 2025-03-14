@@ -133,7 +133,11 @@ function job_run(dir, exe, opt, args) {
         fs.unlink(meta.pid, IGNERR)
     }).on('exit', (code, sig) => {
         fs.unlink(meta.pid, IGNERR)
-        if (code === 0) return
+        if (code === 0) {
+            if (!fs.existsSync(meta.result))
+                fs.writeFile(meta.error, 'exit code 0, but no result', IGNERR)
+            return
+        }
         let msg = code != null ? `exit status ${code}` : sig
         fs.writeFile(meta.error, msg, IGNERR)
     })

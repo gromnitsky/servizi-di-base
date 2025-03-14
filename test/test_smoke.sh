@@ -112,4 +112,24 @@ printf .
 curl -si $host:$port/"$job" | grep_2_patterns '^HTTP/1.1 500' '^SIGKILL' ||
     errx "/$job must return 500, for it was killed"
 
-echo
+# ------------------------------------------------------------------------------
+
+printf "\n%s\n" "invalid services"
+
+for script in false not-an-executable; do
+    printf .
+    job=`curl -sf $host:$port/$script -F a=@/dev/null`
+    try_for_2_sec "$job must not have a pid file" test ! -r "$job/pid"
+    curl -si $host:$port/"$job" |  grep -q '^HTTP/1.1 500' ||
+        errx "/$job/kill must return 500"
+done
+
+printf .
+job=`curl -sf $host:$port/stdin -F a=@/dev/null`
+try_for_2_sec "$job must not have a pid file" test ! -r "$job/pid"
+curl -si $host:$port/"$job" |
+    grep_2_patterns '^HTTP/1.1 500' 'exit code 0, but no result' ||
+    errx "/$job/kill must return 500"
+
+printf .
+grep -q ^trying stdin "$job/log" || errx "/$job/log does not match"
