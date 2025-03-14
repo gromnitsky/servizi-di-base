@@ -138,7 +138,7 @@ function job_run(dir, exe, opt, args) {
                 fs.writeFile(meta.error, 'exit code 0, but no result', IGNERR)
             return
         }
-        let msg = code != null ? `exit status ${code}` : sig
+        let msg = code != null ? `exit code ${code}` : sig
         fs.writeFile(meta.error, msg, IGNERR)
     })
 
