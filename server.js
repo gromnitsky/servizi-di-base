@@ -108,7 +108,7 @@ function job_run(dir, exe, opt, args) {
 
     let cmd = path.join(dir, 'cmd')
 
-    let script_args = ['/dev/null', '-q', '-e']
+    let script_args = ['-q', '-e', '/dev/null']
     if (os.platform() === 'linux') script_args.push('-c')
     script_args.push('./cmd')
 

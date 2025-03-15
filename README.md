@@ -1,6 +1,6 @@
 ## Reqs
 
-node v22, script(1)
+node v22, script(1) with `-e` support (macOS 14.6.1 Sonoma)
 
 ## Usage
 
@@ -51,7 +51,7 @@ Transfer-Encoding: chunked
 2. your script runs in a temp dir that is automatically deleted once a
    user retrieves `result` file;
 
-3. don't write to `pid` and `log` files (all your stdout/stderr
+3. don't write to `pid`, `cmd` and `log` files (all your stdout/stderr
    automatically goes to `log` file);
 
 4. don't read stdin, it's null;
