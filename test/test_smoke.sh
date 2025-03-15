@@ -37,7 +37,7 @@ job=`curl -sf $host:$port/hello -F a=@/dev/null`
 echo "$job" | grep -qE '^jobs/.+$' || "/hello must return a job id: jobs/XXXXXX"
 
 printf .
-try_for_2_sec "$job/log must contain 'hello'" grep -qx hello "$job/log"
+try_for_2_sec "$job/log must contain 'hello'" grep -qx hello$'\r' "$job/log"
 
 printf .
 curl -sf $host:$port/"$job" | grep -qx world || errx "/hello must return 'world'"
@@ -112,4 +112,24 @@ printf .
 curl -si $host:$port/"$job" | grep_2_patterns '^HTTP/1.1 500' '^SIGKILL' ||
     errx "/$job must return 500, for it was killed"
 
-echo
+# ------------------------------------------------------------------------------
+
+printf "\n%s\n" "invalid services"
+
+for script in false not-an-executable; do
+    printf .
+    job=`curl -sf $host:$port/$script -F a=@/dev/null`
+    try_for_2_sec "$job must not have a pid file" test ! -r "$job/pid"
+    curl -si $host:$port/"$job" |  grep -q '^HTTP/1.1 500' ||
+        errx "/$job/kill must return 500"
+done
+
+printf .
+job=`curl -sf $host:$port/stdin -F a=@/dev/null`
+try_for_2_sec "$job must not have a pid file" test ! -r "$job/pid"
+curl -si $host:$port/"$job" |
+    grep_2_patterns '^HTTP/1.1 500' 'exit code 0, but no result' ||
+    errx "/$job/kill must return 500"
+
+printf .
+grep -q ^trying stdin "$job/log" || errx "/$job/log does not match"

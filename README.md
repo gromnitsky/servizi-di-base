@@ -1,6 +1,15 @@
+~~~
+$ scc *js | grep ^[LJ]
+Language    Files  Lines  Blanks  Comments  Code  Complexity
+JavaScript  1      275    48      5         222   41
+~~~
+
 ## Reqs
 
-node v22, stdbuf util from coreutils.
+node v22, script(1) with `-e` option support (macOS 14.6.1 Sonoma).
+
+As it runs user services through a PTY, it's incompatible with Windows
+(WSL2 excluded).
 
 ## Usage
 
@@ -51,7 +60,7 @@ Transfer-Encoding: chunked
 2. your script runs in a temp dir that is automatically deleted once a
    user retrieves `result` file;
 
-3. don't write to `pid` and `log` files (all your stdout/stderr
+3. don't write to `pid`, `cmd` and `log` files (all your stdout/stderr
    automatically goes to `log` file);
 
 4. don't read stdin, it's null;

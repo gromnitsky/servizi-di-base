@@ -1,0 +1,4 @@
+#!/bin/sh
+echo trying stdin
+set -e
+exec cat
