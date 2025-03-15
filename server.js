@@ -258,7 +258,9 @@ function script_util_args(cmd) {
 if (os.platform() === 'win32') errx("unsupported platform")
 
 try {
-    child_process.execFileSync('script', script_util_args('true'))
+    child_process.execFileSync('script', script_util_args('true'), {
+        stdio: ['ignore', 'ignore', 'ignore']
+    })
 } catch (_) {
     errx("'script' util is not found or doesn't support `-e` option")
 }
