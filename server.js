@@ -7,7 +7,6 @@ import child_process from 'child_process'
 import os from 'os'
 
 import busboy from 'busboy'
-import which from './which.js'
 
 function error(writable, code, err, desc) {
     let msg = err.message || err
@@ -107,10 +106,7 @@ function job_run(dir, exe, opt, args) {
     log_stream.on('error', IGNERR)
 
     let cmd = path.join(dir, 'cmd')
-
-    let script_args = ['-q', '-e', '/dev/null']
-    if (os.platform() === 'linux') script_args.push('-c')
-    script_args.push('./cmd')
+    let script_args = script_util_args('./cmd')
 
     fs.writeFileSync(cmd, [
         '#!/bin/sh',
@@ -250,9 +246,22 @@ function errx(...s) {
     process.exit(1)
 }
 
+function script_util_args(cmd) {
+    let r = ['-q', '-e', '/dev/null']
+    if (os.platform() === 'linux') r.push('-c')
+    r.push(cmd)
+    return r
+}
 
-if ( !which('script')) errx("no 'script' util")
+// -----------------------------------------------------------------------------
+
 if (os.platform() === 'win32') errx("unsupported platform")
+
+try {
+    child_process.execFileSync('script', script_util_args('true'))
+} catch (_) {
+    errx("'script' util is not found or doesn't support `-e` option")
+}
 
 if (process.argv[2]) process.chdir(process.argv[2])
 

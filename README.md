@@ -1,6 +1,15 @@
+~~~
+$ scc *js | grep ^[LJ]
+Language    Files  Lines  Blanks  Comments  Code  Complexity
+JavaScript  1      275    48      5         222   41
+~~~
+
 ## Reqs
 
-node v22, script(1) with `-e` support (macOS 14.6.1 Sonoma)
+node v22, script(1) with `-e` option support (macOS 14.6.1 Sonoma).
+
+As it runs user services through a PTY, it's incompatible with Windows
+(WSL2 excluded).
 
 ## Usage
 
